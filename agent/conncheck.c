@@ -2525,7 +2525,7 @@ static CandidateCheckPair *priv_add_peer_reflexive_pair (NiceAgent *agent, guint
   else
     pair->priority = nice_candidate_pair_priority (pair->remote->priority,
         pair->local->priority);
-  pair->nominated = FALSE;
+  pair->nominated = parent_pair->nominated;
   pair->controlling = agent->controlling_mode;
   pair->prflx_priority = ensure_unique_priority (component,
       peer_reflexive_candidate_priority (agent, local_cand));
@@ -2647,8 +2647,12 @@ static CandidateCheckPair *priv_process_response_check_for_reflexive(NiceAgent *
 
   /* note: this is same as "adding to VALID LIST" in the spec
      text */
-  if (new_pair)
+  if (new_pair) {
     new_pair->valid = TRUE;
+    nice_debug ("Agent %p : Mark pair valid %p in priv_process_response_check_for_reflexive", agent, new_pair);
+  } else {
+    nice_debug ("Agent %p : pair not found in priv_process_response_check_for_reflexive", agent);
+  }
 
   return new_pair;
 }
@@ -2733,6 +2737,7 @@ static gboolean priv_map_reply_to_conn_check_request (NiceAgent *agent, NiceStre
             g_assert_not_reached ();
             nice_debug ("Agent %p : Mapped address not found."
                 " conncheck %p SUCCEEDED.", agent, p);
+            nice_debug ("Agent %p : Mark pair valid %p in priv_map_reply_to_conn_check_request", agent, p);
             priv_conn_check_unfreeze_related (agent, stream, p);
           } else {
             ok_pair = priv_process_response_check_for_reflexive (agent,
@@ -3643,6 +3648,7 @@ gboolean conn_check_handle_inbound_stun (NiceAgent *agent, NiceStream *stream,
                 NICE_CHECK_DISCOVERED);
             if (pair) {
               pair->valid = TRUE;
+              nice_debug ("Agent %p : Mark pair valid %p in conn_check_handle_inbound_stun", agent, pair);
             }
           } else
             conn_check_add_for_candidate (agent, stream->id, component, remote_candidate);
