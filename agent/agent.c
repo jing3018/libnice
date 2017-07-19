@@ -5083,6 +5083,18 @@ out:
   return G_SOURCE_REMOVE;
 }
 
+NICEAPI_EXPORT void
+nice_agent_attach_log_func (
+  NiceAgent *agent,
+  NiceAgentLogFunc func)
+{
+    agent_lock (agent);
+    if(agent) {
+        agent->log_func = func;
+    }
+    agent_unlock (agent);
+}
+
 NICEAPI_EXPORT gboolean
 nice_agent_attach_recv (
   NiceAgent *agent,

@@ -69,6 +69,7 @@ nice_interfaces_get_local_ips
 nice_io_stream_new
 nice_input_stream_new
 nice_output_stream_new
+nice_agent_attach_log_func
 pseudo_tcp_set_debug_level
 pseudo_tcp_socket_close
 pseudo_tcp_socket_connect

@@ -223,6 +223,27 @@ typedef struct {
   gint n_buffers;
 } NiceOutputMessage;
 
+/*
+ *
+ *log funciton
+ * 
+*/
+
+ /*
+ * NiceAgentRecvFunc:
+ * @agent: The #NiceAgent Object
+ * @stream_id: The id of the stream
+ * @component_id: The id of the component of the stream
+ *        which received the data
+ * @log_level: The levl of the log: info, debug ..
+ * @format: the format of the log
+ *  
+ * Callback function when agent need to trace a log with janus log fucntion
+ *
+ */
+typedef void (*NiceAgentLogFunc) (
+  NiceAgent *agent, guint log_level,
+  const char* content);
 
 #define NICE_TYPE_AGENT nice_agent_get_type()
 
@@ -920,6 +941,22 @@ nice_agent_attach_recv (
   GMainContext *ctx,
   NiceAgentRecvFunc func,
   gpointer data);
+
+/**
+ * nice_agent_attach_log_func:
+ * @agent: The #NiceAgent Object
+ * @func : the log func to be used
+ *
+ * Retrieves the current state of a component.
+ * 
+ * Returns: void
+ * 
+ * Since: 0.1.8
+ */
+void
+nice_agent_attach_log_func (
+  NiceAgent *agent,
+  NiceAgentLogFunc func);
 
 /**
  * nice_agent_recv:

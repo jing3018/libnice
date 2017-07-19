@@ -169,6 +169,8 @@ struct _NiceAgent
   gboolean use_ice_udp;
   gboolean use_ice_tcp;
   /* XXX: add pointer to internal data struct for ABI-safe extensions */
+  NiceAgentLogFunc    log_func;    /* the log function agent trace log*/
+  GTimeVal   last_log_time;        /* store the last log time */
 };
 
 gboolean

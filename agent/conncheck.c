@@ -61,6 +61,8 @@
 #include "stun/usages/ice.h"
 #include "stun/usages/bind.h"
 #include "stun/usages/turn.h"
+#include <ctype.h>
+#include <stdio.h>
 
 static void priv_update_check_list_failed_components (NiceAgent *agent, NiceStream *stream);
 static void priv_update_check_list_state_for_ready (NiceAgent *agent, NiceStream *stream, NiceComponent *component);
@@ -3341,6 +3343,96 @@ static bool conncheck_stun_validater (StunAgent *agent,
 
   return FALSE;
 }
+/*
+ *
+ *
+ */
+static const char HEX[] = "0123456789abcdef";
+static char hex_encode2(unsigned char val) {
+  //RTC_DCHECK_LT(val, 16);
+  return (val < 16) ? HEX[val] : '!';
+}
+
+
+static size_t hex_encode_with_delimiter2(char* buffer, size_t buflen,
+                                 const char* csource, size_t srclen,
+                                 char delimiter) {
+  //RTC_DCHECK(buffer);  // TODO(grunell): estimate output size
+  // Init and check bounds.
+  const unsigned char* bsource =
+      (const unsigned char*)(csource);
+  size_t srcpos = (size_t)0;
+  size_t bufpos = (size_t)0;
+  size_t needed = (size_t)(delimiter ? (srclen * 3) : (srclen * 2 + 1));
+  if (buflen == 0)
+    return 0;
+
+  if (buflen < needed)
+    return 0;
+
+  while (srcpos < srclen) {
+    unsigned char ch = bsource[srcpos++];
+    buffer[bufpos  ] = hex_encode2((ch >> 4) & 0xF);
+    buffer[bufpos+1] = hex_encode2((ch     ) & 0xF);
+    bufpos += 2;
+
+    // Don't write a delimiter after the last byte.
+    if (delimiter && (srcpos < srclen)) {
+      buffer[bufpos] = delimiter;
+      ++bufpos;
+    }
+  }
+
+  // Null terminate.
+  buffer[bufpos] = '\0';
+  return bufpos;
+}
+
+static char* hex_encode_with_delimiter(char* pbuffer,const char* source, size_t srclen,
+                                      char delimiter) {
+  const size_t kBufferSize = srclen * 3;
+  //char* buffer = STACK_ARRAY(char, kBufferSize);
+  size_t length = hex_encode_with_delimiter2(pbuffer, kBufferSize,
+                                            source, srclen, delimiter);
+  if(length > 0 ) {}
+    //RTC_DCHECK(srclen == 0 || length > 0);
+  return pbuffer;
+}
+
+static char* hex_encode(char* pbDest, const char* source, size_t srclen) {
+  return hex_encode_with_delimiter(pbDest,source, srclen, 0);
+}
+
+static void StrToHex(uint8_t *pbDest, uint8_t *pbSrc, int nLen)
+{
+    /*
+    char h1,h2;
+    uint8_t s1,s2;
+    char str[512];
+    int i;
+    int hex_num = 0;
+    for(i = 0; i<nLen; ++i) {
+        h1 = pbSrc[2*i];
+        h2 = pbSrc[2*i+1];
+    
+        s1 = toupper(h1) - 0x30;
+        if (s1 > 9)
+            s1 -= 7;
+    
+        s2 = toupper(h2) - 0x30;
+        if (s2 > 9)
+            s2 -= 7;
+
+        hex_num = s1*16 + s2;
+        sprintf(str, "%x",hex_num);
+        strcat((char*)pbDest, str);
+       // pbDest[i] = s1*16 + s2;
+    }*/
+    hex_encode((char*)pbDest,(const char*)pbSrc,nLen);
+}
+
+
+
 
 
 /*
@@ -3384,6 +3476,11 @@ gboolean conn_check_handle_inbound_stun (NiceAgent *agent, NiceStream *stream,
   NiceCandidate *local_candidate = NULL;
   gboolean discovery_msg = FALSE;
 
+  StunTransactionId trans_id;
+  char log_str[512];
+  uint8_t hex_id[512];
+  GTimeVal log_now;
+  int can_log = 0;
   nice_address_copy_to_sockaddr (from, &sockaddr.addr);
 
   /* note: contents of 'buf' already validated, so it is
@@ -3601,12 +3698,44 @@ gboolean conn_check_handle_inbound_stun (NiceAgent *agent, NiceStream *stream,
       }
     }
 
+    /*
+     * trace the transaction id of stun request
+     *  NiceAgent *agent, guint stream_id, guint component_id, guint log_level,
+     *    const char* format, ...);
+     */
+
+    /* step: process ongoing STUN transactions */
+    g_get_current_time (&log_now);
+    if(log_now.tv_sec - agent->last_log_time.tv_sec >= 2) {
+        can_log = 1;
+        agent->last_log_time.tv_sec = log_now.tv_sec;
+        agent->last_log_time.tv_usec = log_now.tv_usec;
+    }
+     
+    if(agent->log_func && can_log ==1) {
+       stun_message_id (&req, trans_id);
+       StrToHex(hex_id,trans_id, strlen((const char*)trans_id));
+       sprintf(log_str, "the transation id of received request: %s, current time seconds:%ld\n", hex_id,log_now.tv_sec);
+        agent->log_func(agent,4,log_str);
+    }    
+
     rbuf_len = sizeof (rbuf);
     res = stun_usage_ice_conncheck_create_reply (&component->stun_agent, &req,
         &msg, rbuf, &rbuf_len, &sockaddr.storage, sizeof (sockaddr),
         &control, agent->tie_breaker,
         agent_to_ice_compatibility (agent));
-
+    /*
+    if(agent->log_func && can_log ==1) {
+       memset(trans_id,0,sizeof(trans_id));
+       stun_message_id (&msg, trans_id);
+       memset(hex_id,0,sizeof(hex_id));
+       StrToHex(hex_id,trans_id, strlen((const char*)trans_id));
+       sprintf(log_str, "the transation id of sending response: %s\n", trans_id);
+        agent->log_func(agent,4,log_str);
+       sprintf(log_str, "the transation id of sending response: %s\n", hex_id);
+        agent->log_func(agent,4,log_str);
+    }*/
+    
     if (   agent->compatibility == NICE_COMPATIBILITY_MSN
         || agent->compatibility == NICE_COMPATIBILITY_OC2007) {
       g_free (req.key);
