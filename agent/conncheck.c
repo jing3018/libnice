@@ -2425,10 +2425,23 @@ static gboolean priv_schedule_triggered_check (NiceAgent *agent, NiceStream *str
 static void priv_reply_to_conn_check (NiceAgent *agent, NiceStream *stream,
     NiceComponent *component, NiceCandidate *lcand, NiceCandidate *rcand,
     const NiceAddress *toaddr, NiceSocket *sockptr, size_t rbuf_len,
-    StunMessage *msg, gboolean use_candidate)
+    StunMessage *msg, gboolean use_candidate,int can_log,uint8_t* hex_id)
 {
+  char log_str[512];
   g_assert (rcand == NULL || nice_address_equal(&rcand->addr, toaddr) == TRUE);
-
+  if(can_log && agent->log_func) {
+    gchar tmpbuf[INET6_ADDRSTRLEN];
+    nice_address_to_string (toaddr, tmpbuf);
+    sprintf(log_str,"Agent %p, transaction id [%s] : STUN-CC RESP to '%s:%u', socket=%u, len=%u, cand=%p (c-id:%u), use-cand=%d.\n", agent,
+	     hex_id,
+            tmpbuf,
+	     nice_address_get_port (toaddr),
+             sockptr->fileno ? g_socket_get_fd(sockptr->fileno) : -1,
+	     (unsigned)rbuf_len,
+	     rcand, component->id,
+	     (int)use_candidate);
+    agent->log_func(agent,4,log_str); 
+  }
   if (nice_debug_is_enabled ()) {
     gchar tmpbuf[INET6_ADDRSTRLEN];
     nice_address_to_string (toaddr, tmpbuf);
@@ -3785,7 +3798,7 @@ gboolean conn_check_handle_inbound_stun (NiceAgent *agent, NiceStream *stream,
       }
 
       priv_reply_to_conn_check (agent, stream, component, local_candidate,
-          remote_candidate, from, nicesock, rbuf_len, &msg, use_candidate);
+          remote_candidate, from, nicesock, rbuf_len, &msg, use_candidate, can_log, hex_id);
 
       if (component->remote_candidates == NULL) {
         /* case: We've got a valid binding request to a local candidate
